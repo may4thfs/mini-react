@@ -16,6 +16,6 @@
 //   - 然后通过 render 函数将虚拟 dom 渲染成真实 dom
 
 import ReactDOM from "./core/ReactDom.js"
-import App from "./App.js"
+import App from "./App.jsx"
 
 ReactDOM.createRoot(document.getElementById("root")).render(App)
