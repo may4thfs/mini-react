@@ -4,13 +4,13 @@ import React from "./React.js"
 // ReactDOM.createRoot(document.getElementByid("root")).render(<App />))
 
 const ReactDom = {
-	createRoot(container) {
-		return {
-			render: (App) => {
-				React.render(App, container)
-			}
-		}
-	}
+  createRoot(container) {
+    return {
+      render: (App) => {
+        React.render(App, container)
+      }
+    }
+  }
 }
 
 export default ReactDom
