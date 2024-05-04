@@ -57,29 +57,119 @@ function createElement(type, props, ...children) {
  * @param {*} container 真实的 DOM 节点
  */
 function render(el, container) {
-  // 1. 创建节点（区分类型）
-  const dom =
-    el.type === "TEXT_ELEMENT"
-      ? document.createTextNode("")
-      : document.createElement(el.type)
+  nextWorkOfUnit = {
+    dom: container,
+    props: {
+      children: [el]
+    }
+  }
+}
 
-  // 2. 设置属性，比如 id, class, style 等
-  // 目的：复制 el.props 对象中的所有属性到 dom 对象中，但是排除了 children 属性。这是因为 children 属性是一个数组，需要单独处理
-  Object.keys(el.props).forEach((key) => {
+// 任务单元
+let nextWorkOfUnit = null
+function workLoop(deadline) {
+  let shouldYield = false
+  // 任务分割：如果当前帧剩余时间小于 1ms 以及当前任务有值，则跳出循环，让出主线程
+  while (!shouldYield && nextWorkOfUnit) {
+    // 执行当前任务单元后返回下一个任务单元
+    nextWorkOfUnit = performanceWorkUnit(nextWorkOfUnit)
+    shouldYield = deadline.timeRemaining() < 1
+  }
+
+  requestIdleCallback(workLoop)
+}
+
+/** 封装函数createDom，updateProps，initChildren */
+
+/**
+ * 创建一个真实的 DOM 节点
+ * @param {*} type 节点类型
+ * @returns
+ */
+function createDom(type) {
+  return type === "TEXT_ELEMENT"
+    ? document.createTextNode("")
+    : document.createElement(type)
+}
+
+/**
+ * 将虚拟 DOM 对象的属性更新到真实的 DOM 节点上
+ * @param {*} dom 真实的 DOM 节点
+ * @param {*} props 节点属性
+ */
+function updateProps(dom, props) {
+  Object.keys(props).forEach((key) => {
     if (key !== "children") {
-      dom[key] = el.props[key]
+      dom[key] = props[key]
     }
   })
-
-  // 遍历这个数组中的每个子元素，并递归调用 render 函数将这些子元素渲染到新创建的DOM节点中
-  const children = el.props.children || []
-  children.forEach((child) => {
-    render(child, dom)
-  })
-
-  // 3. 将节点添加到父节点中
-  container.append(dom)
 }
+
+/**
+ * 构建一个虚拟 DOM 树的链表结构。
+ * * 这个结构可以帮助我们在后续的渲染和更新过程中，更方便地遍历和操作虚拟 DOM 树。
+ * * fiber 对象是一个链表结构，包含了当前节点的所有信息。特别是 parent，child，sibling 这三个指针，用来构建节点之间的关系
+ * @param {*} fiber 当前 fiber 节点
+ */
+function initChildren(fiber) {
+  const children = fiber.props.children
+  let prevChild = null // 记录上一个子节点
+  children.forEach((child, index) => {
+    const newFiber = {
+      type: child.type,
+      props: child.props,
+      child: null,
+      parent: fiber,
+      sibling: null,
+      dom: null // 存储与 fiber 对应的真实 DOM 节点
+    }
+
+    // 将第一个节点设置为父节点的 child 属性，其他节点设置为上一个节点的 sibling 属性。这样就形成了一个链表结构。
+    if (index === 0) {
+      fiber.child = newFiber
+    } else {
+      prevChild.sibling = newFiber
+    }
+
+    // 更新 prevChild，以便在下一次循环中，可以将新的节点添加到链表中。
+    prevChild = newFiber
+  })
+}
+
+/**
+ * 执行任务单元
+ * @param {*} fiber 当前任务单元
+ * @returns 返回下一个要执行的任务
+ */
+function performanceWorkUnit(fiber) {
+  // 根据设计，初次进来 fiber.dom 真实节点已存在（如root），所以这里会跳过，直接进入 initChildren
+  if (!fiber.dom) {
+    // 1. 创建真实 dom，并添加到真实 dom 父节点
+    // 同时将真实 DOM 节点保存到 fiber.dom 属性上
+    const dom = (fiber.dom = createDom(fiber.type))
+    fiber.parent.dom.append(dom)
+
+    // 2. 处理 props，将 props 属性更新到真实 DOM 节点上
+    updateProps(dom, fiber.props)
+  }
+
+  // 3. 转换链表，设置好指针（规则：child，sibling，parent）
+  initChildren(fiber)
+
+  // 4. 返回下一个要执行的任务
+  // 优先级：child -> sibling -> parent.sibling（父节点的兄弟节点）
+  if (fiber.child) {
+    return fiber.child
+  }
+
+  if (fiber.sibling) {
+    return fiber.sibling
+  }
+
+  return fiber.parent?.sibling
+}
+
+requestIdleCallback(workLoop)
 
 const React = {
   render,
