@@ -1,4 +1,3 @@
-// v2 动态创建 react -> vdom(js obj) -> real dom
 // vdom 的概念 -- 用 js 对象描述一个节点：{type, props, children}
 // 实现：
 //   - 利用(createTextNode / createElement)函数动态创建虚拟 dom
@@ -39,18 +38,6 @@ function createElement(type, props, ...children) {
   }
 }
 
-// 问题：如何创建一个真实的 DOM 节点？
-// 分析这两段（创建节点的）原生代码步骤：1. 它们都是创建一个节点 2. 通过 props 属性来描述节点的属性 3. 将自己 append 被添加到父节点下
-// const dom = document.createElement(App.type)
-// dom.id = App.props.id
-// document.querySelector("#root").append(dom)
-
-// const textNode = document.createTextNode("")
-// textNode.nodeValue = textEl.props.nodeValue
-// dom.append(textNode)
-
-// 根据分析，将上面的代码封装成一个 render 函数
-
 /**
  * render 函数实现了一个简单的虚拟 DOM 渲染机制，可以将一个虚拟 DOM 对象（转成真实节点）渲染到真实的 DOM 树中。
  * @param {*} el 虚拟 DOM 对象
@@ -63,8 +50,12 @@ function render(el, container) {
       children: [el]
     }
   }
+
+  root = nextWorkOfUnit
 }
 
+// 整个应用的根节点
+let root = null
 // 任务单元
 let nextWorkOfUnit = null
 function workLoop(deadline) {
@@ -73,10 +64,40 @@ function workLoop(deadline) {
   while (!shouldYield && nextWorkOfUnit) {
     // 执行当前任务单元后返回下一个任务单元
     nextWorkOfUnit = performanceWorkUnit(nextWorkOfUnit)
+
     shouldYield = deadline.timeRemaining() < 1
   }
 
+  // 计算结束（没有任务单元，并且整个应用的根节点存在）将所有的 dom 添加到整个应用的根节点上
+  // * 添加到视图上的行为，应该只执行一次，所以这里需要判断 root 是否存在
+  if (!nextWorkOfUnit && root) {
+    commitRoot()
+  }
+
   requestIdleCallback(workLoop)
+}
+
+/** 封装函数 commitRoot，commitWork */
+/**
+ * 将所有的 dom 添加到整个应用的根节点上
+ */
+function commitRoot() {
+  commitWork(root.child)
+  // 当 dom 添加到整个应用的根节点上后，将 root 重置
+  root = null
+}
+
+/**
+ * 将每个 Fiber 节点对应的真实 DOM 节点添加到其父节点上，从而将整个 Fiber 树渲染到真实的 DOM 树中。
+ * @param {*} fiber
+ * @returns
+ */
+function commitWork(fiber) {
+  if (!fiber) return
+
+  fiber.parent.dom.append(fiber.dom)
+  commitWork(fiber.child)
+  commitWork(fiber.sibling)
 }
 
 /** 封装函数createDom，updateProps，initChildren */
@@ -147,7 +168,7 @@ function performanceWorkUnit(fiber) {
     // 1. 创建真实 dom，并添加到真实 dom 父节点
     // 同时将真实 DOM 节点保存到 fiber.dom 属性上
     const dom = (fiber.dom = createDom(fiber.type))
-    fiber.parent.dom.append(dom)
+    // fiber.parent.dom.append(dom)
 
     // 2. 处理 props，将 props 属性更新到真实 DOM 节点上
     updateProps(dom, fiber.props)
