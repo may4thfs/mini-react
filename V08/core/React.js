@@ -61,7 +61,7 @@ function render(el, container) {
 let wipRoot = null
 // 当前应用的根节点
 let currentRoot = null
-// 任务单元
+// 当前（或者说是上一次渲染完成后的）虚拟DOM（vDOM）树的根节点。
 let nextWorkOfUnit = null
 function workLoop(deadline) {
   let shouldYield = false
