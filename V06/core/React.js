@@ -30,9 +30,11 @@ function createElement(type, props, ...children) {
     type,
     props: {
       ...props,
-      // * 这里需要判断 child 是否是 string，如果是 string，就创建一个文本节点，否则就直接使用 child
+
       children: children.map((child) => {
-        return typeof child === "string" ? createTextNode(child) : child
+        const isTextNode =
+          typeof child === "string" || typeof child === "number"
+        return isTextNode ? createTextNode(child) : child
       })
     }
   }
@@ -88,14 +90,26 @@ function commitRoot() {
 }
 
 /**
- * 将每个 Fiber 节点对应的真实 DOM 节点添加到其父节点上，从而将整个 Fiber 树渲染到真实的 DOM 树中。
+ * 递归遍历 Fiber 树，将每个 Fiber 节点对应的真实 DOM 节点添加到其父节点上，从而将整个 Fiber 树渲染到真实的 DOM 树中。
+ * * 它是 React 渲染机制的核心部分，负责将虚拟 DOM 渲染到真实 DOM 中。
+ * * 在 commitWork 函数中，我们首先处理当前的 fiber 节点，然后递归地处理其子节点（fiber.child），然后处理其兄弟节点（fiber.sibling）。这就是深度优先遍历的过程。
  * @param {*} fiber
  * @returns
  */
 function commitWork(fiber) {
   if (!fiber) return
 
-  fiber.parent.dom.append(fiber.dom)
+  // 找到当前 fiber 节点的父节点，并确保父节点有一个对应的 DOM 元素。如果父节点没有对应的 DOM 元素，那么就继续向上查找，直到找到一个有 DOM 元素的父节点。
+  let fiberParent = fiber.parent
+  while (!fiberParent.dom) {
+    fiberParent = fiberParent.parent
+  }
+
+  // 将当前 fiber 节点的 DOM 元素添加到其父节点的 DOM 元素上
+  if (fiber.dom) {
+    fiberParent.dom.append(fiber.dom)
+  }
+
   commitWork(fiber.child)
   commitWork(fiber.sibling)
 }
@@ -130,16 +144,16 @@ function updateProps(dom, props) {
  * 构建一个虚拟 DOM 树的链表结构。
  * * 这个结构可以帮助我们在后续的渲染和更新过程中，更方便地遍历和操作虚拟 DOM 树。
  * * fiber 对象是一个链表结构，包含了当前节点的所有信息。特别是 parent，child，sibling 这三个指针，用来构建节点之间的关系
- * @param {*} fiber 当前 fiber 节点
+ * @param {*} fiber 当前节点
+ * @param {Array} children 当前节点的全部子节点
  */
-function initChildren(fiber) {
-  const children = fiber.props.children
+function initChildren(fiber, children) {
   let prevChild = null // 记录上一个子节点
   children.forEach((child, index) => {
     const newFiber = {
       type: child.type,
       props: child.props,
-      child: null,
+      child: null, // 存储第一个子节点
       parent: fiber,
       sibling: null,
       dom: null // 存储与 fiber 对应的真实 DOM 节点
@@ -157,37 +171,64 @@ function initChildren(fiber) {
   })
 }
 
+/** 封装函数 updateFunctionComponent， updateHostComponent*/
+
+/**
+ * 处理函数组件
+ * @param {*} fiber
+ */
+function updateFunctionComponent(fiber) {
+  const children = [fiber.type(fiber.props)]
+
+  // 转换成链表
+  initChildren(fiber, children)
+}
+
+/**
+ * 处理普通节点
+ * @param {*} fiber
+ */
+function updateHostComponent(fiber) {
+  // 根据设计，初次进来 fiber.dom 真实节点已存在（如root），所以这里会跳过，直接进入 initChildren
+  if (!fiber.dom) {
+    const dom = (fiber.dom = createDom(fiber.type))
+
+    updateProps(dom, fiber.props)
+  }
+
+  // 转换成链表
+  const children = fiber.props.children
+  initChildren(fiber, children)
+}
+
 /**
  * 执行任务单元
+ * * 一个任务单元就是一个 fiber 对象，它包含了当前节点的所有信息，包括节点的类型、属性、子节点等。
  * @param {*} fiber 当前任务单元
  * @returns 返回下一个要执行的任务
  */
 function performanceWorkUnit(fiber) {
-  // 根据设计，初次进来 fiber.dom 真实节点已存在（如root），所以这里会跳过，直接进入 initChildren
-  if (!fiber.dom) {
-    // 1. 创建真实 dom，并添加到真实 dom 父节点
-    // 同时将真实 DOM 节点保存到 fiber.dom 属性上
-    const dom = (fiber.dom = createDom(fiber.type))
-    // fiber.parent.dom.append(dom)
+  // 1. 根据当前任务单元的类型，执行不同的操作
+  const isFunctionComponent = typeof fiber.type === "function"
 
-    // 2. 处理 props，将 props 属性更新到真实 DOM 节点上
-    updateProps(dom, fiber.props)
+  if (isFunctionComponent) {
+    updateFunctionComponent(fiber)
+  } else {
+    updateHostComponent(fiber)
   }
 
-  // 3. 转换链表，设置好指针（规则：child，sibling，parent）
-  initChildren(fiber)
-
-  // 4. 返回下一个要执行的任务
+  // 2. 返回下一个要执行的任务
   // 优先级：child -> sibling -> parent.sibling（父节点的兄弟节点）
   if (fiber.child) {
     return fiber.child
   }
 
-  if (fiber.sibling) {
-    return fiber.sibling
+  // 检查是否有兄弟节点，如果没有，就继续向上查找父节点的兄弟节点
+  let nextFiber = fiber
+  while (nextFiber) {
+    if (nextFiber.sibling) return nextFiber.sibling
+    nextFiber = nextFiber.parent
   }
-
-  return fiber.parent?.sibling
 }
 
 requestIdleCallback(workLoop)
