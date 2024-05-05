@@ -135,7 +135,14 @@ function createDom(type) {
 function updateProps(dom, props) {
   Object.keys(props).forEach((key) => {
     if (key !== "children") {
-      dom[key] = props[key]
+      if (key.startsWith("on")) {
+        // 处理：删除前两个字符，将剩余的字符串转换为小写 onClick -> click
+        const eventType = key.slice(2).toLowerCase()
+        // 添加事件监听
+        dom.addEventListener(eventType, props[key])
+      } else {
+        dom[key] = props[key]
+      }
     }
   })
 }
@@ -148,6 +155,8 @@ function updateProps(dom, props) {
  * @param {Array} children 当前节点的全部子节点
  */
 function initChildren(fiber, children) {
+  console.log("initChildren", fiber)
+
   let prevChild = null // 记录上一个子节点
   children.forEach((child, index) => {
     const newFiber = {
