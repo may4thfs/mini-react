@@ -265,7 +265,8 @@ function updateFunctionComponent(fiber) {
  * @param {*} fiber
  */
 function updateHostComponent(fiber) {
-  // 根据设计，初次进来 fiber.dom 真实节点已存在（如root），所以这里会跳过，直接进入 reconcileChildren
+  // 在首次渲染阶段，创建一个新的 DOM 节点，除了根节点，其他节点都是在这里创建的。
+  // 在更新阶段，dom 节点已经存在。我们只需要更新节点的属性，不需要创建新的节点。
   if (!fiber.dom) {
     const dom = (fiber.dom = createDom(fiber.type))
 
