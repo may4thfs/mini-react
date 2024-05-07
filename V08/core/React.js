@@ -200,7 +200,7 @@ function reconcileChildren(fiber, children) {
 
   let prevChild = null // 记录上一个子节点
   children.forEach((child, index) => {
-    const isSameType = oldFiber && oldFiber.type === oldFiber.type
+    const isSameType = oldFiber && oldFiber.type === child.type
 
     let newFiber
 
