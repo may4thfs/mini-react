@@ -139,8 +139,8 @@ function createDom(type) {
 /**
  * 将虚拟 DOM 对象的属性更新到真实的 DOM 节点上
  * @param {*} dom 真实的 DOM 节点
- * @param {*} nextProps 节点属性
- * @param {*} prevProps 之前的节点属性
+ * @param {*} nextProps 新节点属性
+ * @param {*} prevProps 旧节点属性
  */
 function updateProps(dom, nextProps, prevProps) {
   // Object.keys(props).forEach((key) => {
@@ -215,7 +215,7 @@ function reconcileChildren(fiber, children) {
         sibling: null,
         dom: oldFiber.dom, // 复用旧的 DOM 节点（更新是不会新创建 DOM 节点的）
         effectTag: "UPDATE", // 标记节点的操作类型
-        alternate: oldFiber // 将旧的 fiber 节点存储起来，以便在下一次更新时，可以比较新旧 fiber 节点的差异
+        alternate: oldFiber // 将旧的 fiber 节点存储起来
       }
     } else {
       // add 创建
