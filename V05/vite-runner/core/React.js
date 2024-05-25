@@ -60,7 +60,7 @@ let root = null
 let nextWorkOfUnit = null
 function workLoop(deadline) {
   let shouldYield = false
-  // 任务分割：如果当前帧剩余时间小于 1ms 以及当前任务有值，则跳出循环，让出主线程
+  // 任务分割：如果当前帧剩余时间小于 1ms 或者当前任务没有值，则跳出循环，让出主线程
   while (!shouldYield && nextWorkOfUnit) {
     // 执行当前任务单元后返回下一个任务单元
     nextWorkOfUnit = performanceWorkUnit(nextWorkOfUnit)
