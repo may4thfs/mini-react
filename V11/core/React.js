@@ -245,20 +245,21 @@ function reconcileChildren(fiber, children) {
         alternate: oldFiber // 将旧的 fiber 节点存储起来
       }
     } else {
-      // add 创建
-      newFiber = {
-        type: child.type,
-        props: child.props,
-        child: null, // 存储第一个子节点
-        parent: fiber,
-        sibling: null,
-        dom: null, // 存储与 fiber 对应的真实 DOM 节点
-        effectTag: "PLACEMENT" // 标记节点的操作类型
+      if (child) {
+        // add 创建
+        newFiber = {
+          type: child.type,
+          props: child.props,
+          child: null, // 存储第一个子节点
+          parent: fiber,
+          sibling: null,
+          dom: null, // 存储与 fiber 对应的真实 DOM 节点
+          effectTag: "PLACEMENT" // 标记节点的操作类型
+        }
       }
 
       // 收集需要删除的节点
       if (oldFiber) {
-        console.log("Not the same type, should delete", oldFiber)
         deletions.push(oldFiber)
       }
     }
@@ -276,7 +277,10 @@ function reconcileChildren(fiber, children) {
     }
 
     // 更新 prevChild，以便在下一次循环中，可以将新的节点添加到链表中。
-    prevChild = newFiber
+    // 边界处理：如果 newFiber 不存在，就不需要更新 prevChild
+    if (newFiber) {
+      prevChild = newFiber
+    }
   })
 
   // 收集多出来的所有节点，一并删除
