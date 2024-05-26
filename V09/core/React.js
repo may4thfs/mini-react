@@ -63,6 +63,9 @@ let wipRoot = null
 let currentRoot = null
 // 当前（或者说是上一次渲染完成后的）虚拟DOM（vDOM）树的根节点。
 let nextWorkOfUnit = null
+// 要被删除的节点
+let deletions = []
+
 function workLoop(deadline) {
   let shouldYield = false
   // 任务分割：如果当前帧剩余时间小于 1ms 或者当前任务没有值，则跳出循环，让出主线程
@@ -82,16 +85,40 @@ function workLoop(deadline) {
   requestIdleCallback(workLoop)
 }
 
-/** 封装函数 commitRoot，commitWork */
+/** 封装函数 commitRoot，commitWork，commitDeletion */
 /**
  * 将所有的 dom 添加到整个应用的根节点上
  */
 function commitRoot() {
+  deletions.forEach(commitDeletion)
   commitWork(wipRoot.child)
+
   // 在 dom 全部添加完毕之后记录下来。以便在下一次更新时，可以比较新旧 root 的差异
   currentRoot = wipRoot
   // 当 dom 添加到整个应用的根节点上后，将 root 重置
   wipRoot = null
+  // 重置 deletions 数组
+  deletions = []
+}
+
+/**
+ * 提交删除操作，从 DOM 中删除节点
+ * * 它的主要作用是删除一个或多个节点。在 React 中，每个组件都会被表示为一个 Fiber 节点，这些节点构成了一个 Fiber 树。
+ * @param {*} fiber
+ */
+function commitDeletion(fiber) {
+  // 区分当前的 fiber 是一个普通的 DOM 节点还是一个函数组件，采取不同策略
+  // * 如果是普通的 DOM 节点，直接从 DOM 树中删除
+  // * 如果是函数组件，需要递归删除其子节点
+  if (fiber.dom) {
+    let fiberParent = fiber.parent
+    while (!fiberParent.dom) {
+      fiberParent = fiberParent.parent
+    }
+    fiberParent.dom.removeChild(fiber.dom)
+  } else {
+    commitDeletion(fiber.child)
+  }
 }
 
 /**
@@ -227,6 +254,12 @@ function reconcileChildren(fiber, children) {
         sibling: null,
         dom: null, // 存储与 fiber 对应的真实 DOM 节点
         effectTag: "PLACEMENT" // 标记节点的操作类型
+      }
+
+      // 收集需要删除的节点
+      if (oldFiber) {
+        console.log("Not the same type, should delete", oldFiber)
+        deletions.push(oldFiber)
       }
     }
 
