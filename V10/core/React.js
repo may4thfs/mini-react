@@ -278,6 +278,13 @@ function reconcileChildren(fiber, children) {
     // 更新 prevChild，以便在下一次循环中，可以将新的节点添加到链表中。
     prevChild = newFiber
   })
+
+  // 收集多出来的所有节点，一并删除
+  while (oldFiber) {
+    deletions.push(oldFiber)
+
+    oldFiber = oldFiber.sibling
+  }
 }
 
 /** 封装函数 updateFunctionComponent， updateHostComponent*/

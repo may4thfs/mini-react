@@ -5,7 +5,8 @@ function Counter() {
   const foo = (
     <div>
       foo
-      <div>child</div>
+      <div>child1</div>
+      <div>child2</div>
     </div>
   )
 
